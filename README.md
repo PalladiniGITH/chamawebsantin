@@ -49,8 +49,6 @@ Para acompanhar as requisições encaminhadas pelo gateway, execute:
 ```bash
 docker-compose logs -f gateway
 ```
-Se estiver rodando via Kubernetes, use `kubectl logs deployment/gateway` para ver
-as mesmas mensagens.
 
 Cada requisição gera uma linha de log indicando o método, a rota recebida e o serviço interno escolhido. Você também pode acessar `http://localhost:8081/` e verificar se a mensagem JSON apresenta os caminhos `/tickets` e `/stats`.
 
@@ -65,54 +63,4 @@ Um script `backup_db.sh` está disponível para gerar backups da base MySQL. Voc
 
 Todos os acessos e ações relevantes são registrados na tabela `logs` do banco de dados, permitindo auditoria completa.
 
-
-## Kubernetes
-
-Os manifestos em `k8s/` definem Deployments e Services para cada microserviço.
-Antes de aplicar, crie as imagens com as tags esperadas (o `docker-compose.yml` já define essas tags):
-
-```bash
-docker build -t web:latest -f Dockerfile .
-docker build -t gateway:latest -f services/gateway/Dockerfile .
-docker build -t tickets:latest -f services/tickets/Dockerfile .
-docker build -t stats:latest -f services/stats/Dockerfile .
-# ou simplesmente
-docker-compose build
-```
-
-Se estiver utilizando o Minikube, carregue-as no cluster:
-
-```bash
-minikube image load web:latest
-minikube image load gateway:latest
-minikube image load tickets:latest
-minikube image load stats:latest
-```
-
-Em seguida aplique os arquivos:
-
-```bash
-kubectl apply -f k8s/
-```
-
-Isso criará as instâncias `web`, `gateway`, `tickets`, `stats`, `db` e `phpmyadmin`. O banco de dados será populado pelo script `script_sql.sql` via ConfigMap.
-O portal web é exposto via NodePort nas portas `30080` (HTTP) e `30443` (HTTPS). O gateway usa a porta `30081`. Para descobrir os endereços no Minikube, execute:
-
-```bash
-minikube service web
-minikube service gateway
-```
-
-
-
-Ou encaminhe a porta manualmente:
-
-```bash
-kubectl port-forward service/web 8080:80
-kubectl port-forward service/gateway 8081:80
-kubectl port-forward service/web 8443:443
-```
-Depois acesse `http://localhost:8080` para o portal web, `http://localhost:8081` para o gateway ou `https://localhost:8443` para conexão segura.
-
-Se algum pod ficar em `ImagePullBackOff`, verifique se as imagens estão disponíveis no Minikube com `minikube image ls`. Os manifestos definem `imagePullPolicy: Never` justamente para usar as imagens locais. Caso faltem, execute novamente `docker-compose build` e `minikube image load <nome>:latest` para cada serviço.
 
