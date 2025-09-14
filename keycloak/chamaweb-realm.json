@@ -1,0 +1,22 @@
+{
+  "realm": "ChamaWeb",
+  "enabled": true,
+  "clients": [
+    {
+      "clientId": "portal",
+      "publicClient": true,
+      "redirectUris": ["*"]
+    }
+  ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {"type": "password", "value": "ChangeMe123", "temporary": false}
+      ],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    }
+  ]
+}

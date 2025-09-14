@@ -1,65 +1,156 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  web:
-    build: .
-    image: web:latest
-    ports:
-      - "8080:80"
-      - "8443:443"
-    depends_on:
-      - gateway
-
-  gateway:
-    build:
-      context: .
-      dockerfile: services/gateway/Dockerfile
-    image: gateway:latest
-    ports:
-      - "8081:80"
-    depends_on:
-      - tickets
-      - stats
-
-  tickets:
-    build:
-      context: .
-      dockerfile: services/tickets/Dockerfile
-    image: tickets:latest
-    depends_on:
-      - db
-
-  stats:
-    build:
-      context: .
-      dockerfile: services/stats/Dockerfile
-    image: stats:latest
-    depends_on:
-      - db
-
-  db:
-    image: mysql:5.7
-    restart: always
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: chamaweb
-      MYSQL_USER: user
-      MYSQL_PASSWORD: userpass
-    ports:
-      - "3306:3306"
+  kali:
+    image: kalilinux/kali-rolling
+    hostname: kali
+    networks:
+      internet:
+        ipv4_address: 10.10.0.2
     volumes:
-      - db_data:/var/lib/mysql
-      - ./script_sql.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./scripts:/scripts:ro
+      - ./scripts/bootstrap_kali.sh:/bootstrap_kali.sh:ro
+    entrypoint: ["/bin/bash", "/bootstrap_kali.sh"]
+    command: ["tail", "-f", "/dev/null"]
 
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    restart: always
+  fw:
+    build: ./fw
+    networks:
+      internet:
+        ipv4_address: 10.10.0.1
+      dmz:
+        ipv4_address: 10.20.0.1
+      internal:
+        ipv4_address: 10.30.0.1
+    cap_add:
+      - NET_ADMIN
+    sysctls:
+      - net.ipv4.ip_forward=1
+    healthcheck:
+      test: ["CMD", "ping", "-c", "1", "8.8.8.8"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  nginx-waf:
+    build: ./nginx
+    depends_on:
+      - fw
+      - api-gateway
+    networks:
+      dmz:
+        ipv4_address: 10.20.0.10
     ports:
-      - "8082:80"
-    environment:
-      PMA_HOST: db
-      MYSQL_ROOT_PASSWORD: root
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./logs/nginx:/var/log/nginx
+      - ./scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD", "curl", "-k", "https://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
+  api-gateway:
+    build: ./api
+    networks:
+      internal:
+        ipv4_address: 10.30.0.10
+    secrets:
+      - db_user
+      - db_password
+    depends_on:
+      - mysql
+      - keycloak
+    environment:
+      DB_HOST: mysql
+      DB_NAME: appdb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  mysql:
+    image: mysql:8
+    networks:
+      internal:
+        ipv4_address: 10.30.0.20
+    environment:
+      MYSQL_DATABASE: appdb
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d
+    secrets:
+      - db_root_password
+      - db_user
+      - db_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: ["start-dev"]
+    networks:
+      internal:
+        ipv4_address: 10.30.0.30
+    environment:
+      KEYCLOAK_ADMIN_FILE: /run/secrets/kc_admin_user
+      KEYCLOAK_ADMIN_PASSWORD_FILE: /run/secrets/kc_admin_password
+      KEYCLOAK_IMPORT: /opt/keycloak/data/import/chamaweb-realm.json
+    volumes:
+      - ./keycloak/chamaweb-realm.json:/opt/keycloak/data/import/chamaweb-realm.json:ro
+    secrets:
+      - kc_admin_user
+      - kc_admin_password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  wazuh:
+    image: busybox
+    command: ["sh", "-c", "echo 'Wazuh placeholder' && sleep infinity"]
+    profiles: ["wazuh"]
+    networks:
+      internal:
+        ipv4_address: 10.30.0.40
+
+secrets:
+  db_user:
+    file: ./secrets/db_user.example
+  db_password:
+    file: ./secrets/db_password.example
+  db_root_password:
+    file: ./secrets/db_root_password.example
+  kc_admin_user:
+    file: ./secrets/kc_admin_user.example
+  kc_admin_password:
+    file: ./secrets/kc_admin_password.example
+
+networks:
+  internet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.10.0.0/24
+  dmz:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.20.0.0/24
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.30.0.0/24
 
 volumes:
-  db_data:
+  mysql_data:

@@ -1,0 +1,8 @@
+secrets/*
+!secrets/*.example
+nginx/certs/*
+mysql_data/
+__pycache__/
+*.pyc
+logs/*
+!logs/.gitkeep
