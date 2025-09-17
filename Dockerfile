@@ -31,7 +31,9 @@ RUN a2enmod rewrite ssl && \
       -out /etc/ssl/certs/selfsigned.crt \
       -subj "/CN=localhost" && \
     sed -i 's#/etc/ssl/certs/ssl-cert-snakeoil.pem#/etc/ssl/certs/selfsigned.crt#' /etc/apache2/sites-available/default-ssl.conf && \
-    sed -i 's#/etc/ssl/private/ssl-cert-snakeoil.key#/etc/ssl/private/selfsigned.key#' /etc/apache2/sites-available/default-ssl.conf
+    sed -i 's#/etc/ssl/private/ssl-cert-snakeoil.key#/etc/ssl/private/selfsigned.key#' /etc/apache2/sites-available/default-ssl.conf && \
+    a2dissite 000-default && \
+    sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
 
 # Instalar as dependências do Composer (se houver um composer.json)
 WORKDIR /var/www/html
@@ -40,4 +42,4 @@ RUN if [ -f "composer.json" ]; then composer install --no-interaction; fi
 # Define o diretório de trabalho padrão
 WORKDIR /var/www/html
 
-EXPOSE 80 443
+EXPOSE 443

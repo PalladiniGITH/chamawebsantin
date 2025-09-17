@@ -25,22 +25,24 @@ docker-compose up --build
 
 O serviço **web** utiliza o diretório do projeto como DocumentRoot. O arquivo `index.php` exibe a página de login.
 
-O portal web pode ser acessado em `http://localhost:8080`.
-O API Gateway estará em `http://localhost:8081` e fará a mediação das chamadas para os demais serviços.
-O contêiner `web` possui um certificado autoassinado configurado no Apache,
-permitindo acesso seguro em `https://localhost:8443`. O navegador exibirá um aviso
-de conexão não segura; aceite o risco para prosseguir nos testes locais.
+O portal web pode ser acessado exclusivamente em `https://localhost:8443`.
+O Apache está configurado somente para HTTPS e a porta 80 foi desabilitada no contêiner,
+garantindo que a máquina host exponha apenas a porta 8443. O navegador exibirá um aviso
+de conexão não segura por se tratar de um certificado autoassinado; aceite o risco para
+prosseguir nos testes locais.
 
-Para fazer login utilize `http://localhost:8080/` ou `https://localhost:8443/`.
+O API Gateway, o banco de dados e os demais microserviços permanecem acessíveis apenas
+pela rede interna do Docker, utilizando os nomes dos serviços (`gateway`, `tickets`, `stats` e `db`).
+Para fazer login utilize `https://localhost:8443/`.
 
 ## Endpoints
 
  Ao acessar o endereço acima, você verá uma mensagem com os caminhos disponíveis.
 
- - `http://localhost:8081/tickets` - API de gerenciamento de chamados
- - `http://localhost:8081/stats` - API de estatísticas para o relatório
-   (também acessíveis via HTTPS em `https://localhost:8443/api/...`)
-- `api/create_ticket.php` - proxy que envia o formulario de novo chamado ao gateway, evitando problemas de CORS.
+ - `https://localhost:8443/api/tickets.php` - proxy que expõe as operações do gateway pela porta segura
+ - `https://localhost:8443/api_stats.php` - endpoint HTTPS para o microserviço de estatísticas
+   (internamente, ambos os scripts utilizam `http://gateway/` para chegar aos microserviços)
+ - `api/create_ticket.php` - proxy que envia o formulario de novo chamado ao gateway, evitando problemas de CORS.
 
 ## Verificando o gateway
 
@@ -50,7 +52,7 @@ Para acompanhar as requisições encaminhadas pelo gateway, execute:
 docker-compose logs -f gateway
 ```
 
-Cada requisição gera uma linha de log indicando o método, a rota recebida e o serviço interno escolhido. Você também pode acessar `http://localhost:8081/` e verificar se a mensagem JSON apresenta os caminhos `/tickets` e `/stats`.
+Cada requisição gera uma linha de log indicando o método, a rota recebida e o serviço interno escolhido.
 
 ## Segurança e Manutenção
 
@@ -60,6 +62,12 @@ Ao autenticar, um token JWT é gerado e armazenado na sessão. Esse token
 requisição aos microserviços.
 
 Um script `backup_db.sh` está disponível para gerar backups da base MySQL. Você pode agendar sua execução diária via cron. Há também o utilitário `sla_monitor.php` que dispara notificações antes do vencimento do SLA dos chamados.
+
+Caso precise interagir diretamente com o banco, utilize o cliente MySQL dentro do contêiner (nenhuma porta do MySQL é publicada na máquina host; o contêiner do phpMyAdmin também permanece acessível apenas internamente):
+
+```bash
+docker-compose exec db mysql -u root -p
+```
 
 Todos os acessos e ações relevantes são registrados na tabela `logs` do banco de dados, permitindo auditoria completa.
 
