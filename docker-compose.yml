@@ -6,6 +6,14 @@ services:
     image: web:latest
     ports:
       - "8443:443"
+    environment:
+      APACHE_SSL_CERT_FILE: ${APACHE_SSL_CERT_FILE:-/certs/server.crt}
+      APACHE_SSL_KEY_FILE: ${APACHE_SSL_KEY_FILE:-/certs/server.key}
+      APACHE_SSL_CHAIN_FILE: ${APACHE_SSL_CHAIN_FILE:-}
+      APACHE_SSL_SELF_SIGNED_SUBJECT: ${APACHE_SSL_SELF_SIGNED_SUBJECT:-/CN=localhost}
+      APACHE_SSL_SELF_SIGNED_DAYS: ${APACHE_SSL_SELF_SIGNED_DAYS:-365}
+    volumes:
+      - ./certs:/certs:ro
     depends_on:
       - gateway
 

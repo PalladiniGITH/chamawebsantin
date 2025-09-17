@@ -27,9 +27,39 @@ O serviço **web** utiliza o diretório do projeto como DocumentRoot. O arquivo 
 
 O portal web pode ser acessado exclusivamente em `https://localhost:8443`.
 O Apache está configurado somente para HTTPS e a porta 80 foi desabilitada no contêiner,
-garantindo que a máquina host exponha apenas a porta 8443. O navegador exibirá um aviso
-de conexão não segura por se tratar de um certificado autoassinado; aceite o risco para
-prosseguir nos testes locais.
+garantindo que a máquina host exponha apenas a porta 8443.
+
+Para evitar o alerta de "conexão não segura", coloque um certificado emitido por uma
+autoridade confiável nos arquivos `certs/server.crt` e `certs/server.key` antes de
+executar o `docker-compose up`. O contêiner copiará automaticamente o material
+personalizado durante a inicialização. Caso você utilize o pfSense, emita o certificado
+pelas autoridades internas, exporte-o em formato PEM e distribua o certificado da CA
+para o Kali e demais navegadores do laboratório, garantindo que eles reconheçam o
+cadeado HTTPS sem avisos. Se nenhum certificado personalizado for fornecido, o contêiner
+gera automaticamente um certificado autoassinado apenas para testes rápidos.
+
+### Configurando o certificado HTTPS
+
+1. Gere ou obtenha um certificado válido para o host que responderá em `https://localhost:8443`.
+   No pfSense, utilize a autoridade certificadora interna e exporte o certificado e a chave
+   privada em formato PEM.
+2. Salve os arquivos no diretório `certs/` da raiz do projeto como `server.crt` (cadeia ou
+   fullchain) e `server.key`. Um arquivo de cadeia separado também pode ser informado via
+   variável `APACHE_SSL_CHAIN_FILE`.
+3. (Opcional) Ajuste o arquivo `.env` para apontar outros caminhos, caso utilize nomes
+   diferentes:
+
+   ```env
+   APACHE_SSL_CERT_FILE=/certs/meu-certificado.pem
+   APACHE_SSL_KEY_FILE=/certs/minha-chave.key
+   APACHE_SSL_CHAIN_FILE=/certs/ca-intermediaria.pem
+   ```
+
+4. Suba os serviços novamente com `docker-compose up --build`. O script de inicialização
+   detectará os arquivos e configurará o Apache automaticamente.
+
+Com essa configuração, os navegadores reconhecerão o certificado como confiável assim que o
+certificado da autoridade emissora estiver instalado no ambiente.
 
 O API Gateway, o banco de dados e os demais microserviços permanecem acessíveis apenas
 pela rede interna do Docker, utilizando os nomes dos serviços (`gateway`, `tickets`, `stats` e `db`).
