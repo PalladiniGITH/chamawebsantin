@@ -61,6 +61,48 @@ gera automaticamente um certificado autoassinado apenas para testes rápidos.
 Com essa configuração, os navegadores reconhecerão o certificado como confiável assim que o
 certificado da autoridade emissora estiver instalado no ambiente.
 
+### Como usar no Docker / Apache
+
+No `docker-compose.yml` monte `./certs`:
+
+```yaml
+services:
+  web:
+    build: .
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./certs:/certs:ro
+```
+
+No Apache (exemplo `/etc/apache2/sites-available/000-default-le-ssl.conf`):
+
+```apache
+<VirtualHost *:8443>
+  ServerName 192.168.8.66
+
+  SSLEngine on
+  SSLCertificateFile /certs/server.crt
+  SSLCertificateKeyFile /certs/server.key
+  # se tiver chain separado:
+  # SSLCertificateChainFile /certs/ca.crt
+
+  # Segurança TLS mínima recomendada
+  SSLOpenSSLConfCmd Protocol -ALL +TLSv1.2 +TLSv1.3
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+
+  DocumentRoot /var/www/html
+</VirtualHost>
+```
+
+Rebuild e up:
+
+```bash
+docker-compose up --build -d
+```
+
 O API Gateway, o banco de dados e os demais microserviços permanecem acessíveis apenas
 pela rede interna do Docker, utilizando os nomes dos serviços (`gateway`, `tickets`, `stats` e `db`).
 Para fazer login utilize `https://localhost:8443/`.

@@ -24,12 +24,14 @@ COPY . /var/www/html/
 RUN chown -R www-data:www-data /var/www/html
 
 # Ativa o mod_rewrite do Apache (se necessário)
-RUN a2enmod rewrite ssl && \
+RUN a2enmod rewrite ssl headers && \
     a2ensite default-ssl && \
     sed -i 's#/etc/ssl/certs/ssl-cert-snakeoil.pem#/etc/ssl/certs/web.crt#' /etc/apache2/sites-available/default-ssl.conf && \
     sed -i 's#/etc/ssl/private/ssl-cert-snakeoil.key#/etc/ssl/private/web.key#' /etc/apache2/sites-available/default-ssl.conf && \
+    sed -i 's#<VirtualHost _default_:443>#<VirtualHost *:8443>#' /etc/apache2/sites-available/default-ssl.conf && \
     a2dissite 000-default && \
-    sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf
+    sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf && \
+    sed -i 's/Listen 443/Listen 8443/g' /etc/apache2/ports.conf
 
 COPY docker/apache/start-apache.sh /usr/local/bin/start-apache.sh
 RUN chmod +x /usr/local/bin/start-apache.sh
@@ -41,6 +43,6 @@ RUN if [ -f "composer.json" ]; then composer install --no-interaction; fi
 # Define o diretório de trabalho padrão
 WORKDIR /var/www/html
 
-EXPOSE 443
+EXPOSE 8443
 
 CMD ["start-apache.sh"]
