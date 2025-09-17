@@ -42,7 +42,7 @@ ensure_cert_directives() {
     fi
 }
 
-REQUIRE_CUSTOM_CERT="${APACHE_SSL_REQUIRE_CUSTOM_CERT:-true}"
+REQUIRE_CUSTOM_CERT="${APACHE_SSL_REQUIRE_CUSTOM_CERT:-false}"
 
 if [[ -f "${CERT_SOURCE}" && -f "${KEY_SOURCE}" ]]; then
     echo "[web] Usando certificado TLS personalizado encontrado em ${CERT_SOURCE}."
@@ -61,7 +61,7 @@ else
         echo "[web] ERRO: Arquivos de certificado e chave não encontrados." >&2
         echo "[web]       Esperado certificado em: ${CERT_SOURCE}" >&2
         echo "[web]       Esperada chave em: ${KEY_SOURCE}" >&2
-        echo "[web]       Ajuste os caminhos ou desative APACHE_SSL_REQUIRE_CUSTOM_CERT caso queira permitir autoassinados." >&2
+        echo "[web]       Ajuste os caminhos ou defina APACHE_SSL_REQUIRE_CUSTOM_CERT=false para permitir autoassinados." >&2
         exit 1
     fi
 
