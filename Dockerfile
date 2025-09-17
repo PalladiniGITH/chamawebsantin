@@ -20,9 +20,6 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Copia os arquivos do projeto para dentro do Apache
 COPY . /var/www/html/
 
-# Dá permissão aos arquivos
-RUN chown -R www-data:www-data /var/www/html
-
 # Ativa o mod_rewrite do Apache (se necessário)
 RUN a2enmod rewrite ssl headers && \
     a2ensite default-ssl && \
@@ -39,6 +36,9 @@ RUN chmod +x /usr/local/bin/start-apache.sh
 # Instalar as dependências do Composer (se houver um composer.json)
 WORKDIR /var/www/html
 RUN if [ -f "composer.json" ]; then composer install --no-interaction; fi
+
+# Dá permissão aos arquivos
+RUN chown -R www-data:www-data /var/www/html
 
 # Define o diretório de trabalho padrão
 WORKDIR /var/www/html
