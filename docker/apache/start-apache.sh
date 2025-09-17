@@ -12,6 +12,17 @@ CHAIN_SOURCE="${APACHE_SSL_CHAIN_FILE:-}"
 SELF_SIGNED_SUBJECT="${APACHE_SSL_SELF_SIGNED_SUBJECT:-/CN=localhost}"
 SELF_SIGNED_DAYS="${APACHE_SSL_SELF_SIGNED_DAYS:-365}"
 
+is_truthy() {
+    case "$1" in
+        1|true|TRUE|True|yes|YES|on|ON|y|Y)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 ensure_cert_directives() {
     local cert_path="$1"
     local key_path="$2"
@@ -31,6 +42,8 @@ ensure_cert_directives() {
     fi
 }
 
+REQUIRE_CUSTOM_CERT="${APACHE_SSL_REQUIRE_CUSTOM_CERT:-true}"
+
 if [[ -f "${CERT_SOURCE}" && -f "${KEY_SOURCE}" ]]; then
     echo "[web] Usando certificado TLS personalizado encontrado em ${CERT_SOURCE}."
     install -m 0644 "${CERT_SOURCE}" "${CERT_DEST}"
@@ -44,7 +57,15 @@ if [[ -f "${CERT_SOURCE}" && -f "${KEY_SOURCE}" ]]; then
         rm -f "${CHAIN_DEST}"
     fi
 else
-    echo "[web] Nenhum certificado personalizado encontrado; gerando certificado autoassinado apenas para testes."
+    if is_truthy "${REQUIRE_CUSTOM_CERT}"; then
+        echo "[web] ERRO: Arquivos de certificado e chave não encontrados." >&2
+        echo "[web]       Esperado certificado em: ${CERT_SOURCE}" >&2
+        echo "[web]       Esperada chave em: ${KEY_SOURCE}" >&2
+        echo "[web]       Ajuste os caminhos ou desative APACHE_SSL_REQUIRE_CUSTOM_CERT caso queira permitir autoassinados." >&2
+        exit 1
+    fi
+
+    echo "[web] Nenhum certificado personalizado encontrado; gerando certificado autoassinado apenas para testes." >&2
     openssl req -x509 -nodes -days "${SELF_SIGNED_DAYS}" -newkey rsa:2048 \
         -keyout "${KEY_DEST}" \
         -out "${CERT_DEST}" \

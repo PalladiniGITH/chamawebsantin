@@ -7,6 +7,7 @@ services:
     ports:
       - "8443:8443"
     environment:
+      APACHE_SSL_REQUIRE_CUSTOM_CERT: ${APACHE_SSL_REQUIRE_CUSTOM_CERT:-true}
       APACHE_SSL_CERT_FILE: ${APACHE_SSL_CERT_FILE:-/certs/server.crt}
       APACHE_SSL_KEY_FILE: ${APACHE_SSL_KEY_FILE:-/certs/server.key}
       APACHE_SSL_CHAIN_FILE: ${APACHE_SSL_CHAIN_FILE:-}

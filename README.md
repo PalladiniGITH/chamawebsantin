@@ -31,12 +31,15 @@ garantindo que a máquina host exponha apenas a porta 8443.
 
 Para evitar o alerta de "conexão não segura", coloque um certificado emitido por uma
 autoridade confiável nos arquivos `certs/server.crt` e `certs/server.key` antes de
-executar o `docker-compose up`. O contêiner copiará automaticamente o material
-personalizado durante a inicialização. Caso você utilize o pfSense, emita o certificado
-pelas autoridades internas, exporte-o em formato PEM e distribua o certificado da CA
-para o Kali e demais navegadores do laboratório, garantindo que eles reconheçam o
-cadeado HTTPS sem avisos. Se nenhum certificado personalizado for fornecido, o contêiner
-gera automaticamente um certificado autoassinado apenas para testes rápidos.
+executar o `docker-compose up`. O contêiner copia automaticamente o material
+personalizado durante a inicialização e, por padrão, **interrompe a inicialização caso
+não encontre os arquivos**, evitando que um certificado autoassinado apareça por
+engano. Caso você utilize o pfSense, emita o certificado pelas autoridades internas,
+exporte-o em formato PEM e distribua o certificado da CA para o Kali e demais
+navegadores do laboratório, garantindo que eles reconheçam o cadeado HTTPS sem avisos.
+Se precisar utilizar um certificado autoassinado apenas em um ambiente de testes,
+defina `APACHE_SSL_REQUIRE_CUSTOM_CERT=false` no `.env` para permitir a geração
+automática.
 
 ### Configurando o certificado HTTPS
 
@@ -46,17 +49,21 @@ gera automaticamente um certificado autoassinado apenas para testes rápidos.
 2. Salve os arquivos no diretório `certs/` da raiz do projeto como `server.crt` (cadeia ou
    fullchain) e `server.key`. Um arquivo de cadeia separado também pode ser informado via
    variável `APACHE_SSL_CHAIN_FILE`.
-3. (Opcional) Ajuste o arquivo `.env` para apontar outros caminhos, caso utilize nomes
-   diferentes:
+3. (Opcional) Ajuste o arquivo `.env` para apontar outros caminhos (ou liberar o uso de
+   autoassinados), caso utilize nomes diferentes:
 
    ```env
+   # Defina "false" apenas se quiser que o contêiner aceite gerar um certificado de testes.
+   APACHE_SSL_REQUIRE_CUSTOM_CERT=true
    APACHE_SSL_CERT_FILE=/certs/meu-certificado.pem
    APACHE_SSL_KEY_FILE=/certs/minha-chave.key
    APACHE_SSL_CHAIN_FILE=/certs/ca-intermediaria.pem
    ```
 
 4. Suba os serviços novamente com `docker-compose up --build`. O script de inicialização
-   detectará os arquivos e configurará o Apache automaticamente.
+   detectará os arquivos e configurará o Apache automaticamente. Se algum arquivo
+   estiver ausente, o contêiner do Apache encerrará com uma mensagem indicando os
+   caminhos esperados (verifique com `docker-compose logs web`).
 
 Com essa configuração, os navegadores reconhecerão o certificado como confiável assim que o
 certificado da autoridade emissora estiver instalado no ambiente.
