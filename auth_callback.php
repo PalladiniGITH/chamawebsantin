@@ -4,6 +4,7 @@ require_once 'vendor/autoload.php';
 require_once 'inc/CognitoAuth.php';
 require_once 'inc/connect.php';
 require_once 'shared/log.php';
+require_once 'auth_token.php';
 
 if (!isset($_GET['code'])) {
     header('Location: /index.php?erro=2');
@@ -43,7 +44,7 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$user) {
     $senhaTemp = bin2hex(random_bytes(8));
     $senhaHash = hash('sha256', $senhaTemp);
-    $stmtNewUser = $pdo->prepare('INSERT INTO users (nome, email, senha, role) VALUES (:nome, :email, :senha, "usuario")');
+    $stmtNewUser = $pdo->prepare('INSERT INTO users (nome, email, senha, role, auth_provider) VALUES (:nome, :email, :senha, "usuario", "cognito")');
     $stmtNewUser->execute([
         'nome' => $name,
         'email' => $email,
@@ -52,6 +53,11 @@ if (!$user) {
     $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email');
     $stmt->execute(['email' => $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
+} elseif (($user['auth_provider'] ?? 'local') !== 'cognito') {
+    // Atualiza o provedor para manter consistência na auditoria
+    $stmtUpdateProvider = $pdo->prepare('UPDATE users SET auth_provider = "cognito" WHERE id = :id');
+    $stmtUpdateProvider->execute(['id' => $user['id']]);
+    $user['auth_provider'] = 'cognito';
 }
 
 if ($user['blocked']) {
@@ -64,6 +70,11 @@ $_SESSION['user_id'] = $user['id'];
 $_SESSION['nome'] = $user['nome'];
 $_SESSION['role'] = $user['role'];
 $_SESSION['cognito_auth'] = true;
+$_SESSION['jwt'] = jwt_encode([
+    'id' => $user['id'],
+    'role' => $user['role'],
+    'exp' => time() + 3600
+]);
 
 registrarLog($pdo, 'LOGIN', 'Login via Cognito', $user['id']);
 header('Location: dashboard.php');
