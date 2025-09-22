@@ -4,6 +4,13 @@ require_once 'inc/connect.php';
 require_once 'shared/log.php';
 require_once 'auth_token.php';
 
+function redirect_with_login_error(string $message = 'Usuário ou senha inválidos.'): void
+{
+    $_SESSION['login_error'] = $message;
+    header('Location: index.php');
+    exit;
+}
+
 $email = strtolower(trim($_POST['email'] ?? ''));
 $senha = $_POST['senha'] ?? '';
 $senhaHash = hash('sha256', $senha);
@@ -14,30 +21,30 @@ try {
     $stmt->execute();
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($user) {
-        if (hash_equals($user['senha'], $senhaHash)) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['role']    = $user['role'];
-            $_SESSION['nome']    = $user['nome'];
-            $_SESSION['jwt']     = jwt_encode([
-                'id' => $user['id'],
-                'role' => $user['role'],
-                'exp' => time() + 3600
-            ]);
+    if ($user && hash_equals($user['senha'], $senhaHash)) {
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['role']    = $user['role'];
+        $_SESSION['nome']    = $user['nome'];
+        $_SESSION['jwt']     = jwt_encode([
+            'id' => $user['id'],
+            'role' => $user['role'],
+            'exp' => time() + 3600
+        ]);
 
-            registrarLog($pdo, 'LOGIN', 'Login local', $user['id']);
-            header('Location: dashboard.php');
-            exit;
-        } else {
-            registrarLog($pdo, 'ERRO_LOGIN', 'Senha incorreta', $user['id']);
-            echo "Senha inválida!";
-        }
-    } else {
-        registrarLog($pdo, 'ERRO_LOGIN', 'Usuário inexistente: '.$email);
-        echo "Nenhum usuário localizado.";
+        registrarLog($pdo, 'LOGIN', 'Login local', $user['id']);
+        header('Location: dashboard.php');
+        exit;
     }
+
+    if ($user) {
+        registrarLog($pdo, 'ERRO_LOGIN', 'Senha incorreta', $user['id']);
+    } else {
+        registrarLog($pdo, 'ERRO_LOGIN', 'Usuário inexistente: ' . $email);
+    }
+
+    redirect_with_login_error();
 } catch (PDOException $e) {
-    echo "Erro de PDO: " . $e->getMessage();
+    error_log('Erro ao processar login: ' . $e->getMessage());
+    redirect_with_login_error('Não foi possível processar o login. Tente novamente mais tarde.');
 }
-exit;
 ?>
