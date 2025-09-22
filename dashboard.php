@@ -5,6 +5,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 require_once 'auth_token.php';
+require_once __DIR__ . '/inc/security.php';
 
 // Verifica se o usuário está logado
 if (!isset($_SESSION['user_id'])) {
@@ -48,7 +49,7 @@ if ($role !== 'usuario') {
   <link rel="stylesheet" href="/css/enhanced.css" />
 <link rel="stylesheet" href="/css/theme.css" />
   <script>
-    window.JWT_TOKEN = '<?php echo $_SESSION['jwt']; ?>';
+    window.JWT_TOKEN = <?php echo json_encode($_SESSION['jwt'] ?? ''); ?>;
   </script>
 </head>
 <body>
@@ -82,7 +83,7 @@ if ($role !== 'usuario') {
         <select name="team_id" id="team_id">
           <option value="">-- Equipe --</option>
           <?php foreach ($teams as $t): ?>
-            <option value="<?php echo $t['id']; ?>"><?php echo $t['nome']; ?></option>
+            <option value="<?php echo (int) ($t['id'] ?? 0); ?>"><?php echo e($t['nome'] ?? ''); ?></option>
           <?php endforeach; ?>
         </select>
       <?php endif; ?>
@@ -103,18 +104,27 @@ if ($role !== 'usuario') {
     </thead>
     <tbody>
       <?php foreach ($tickets as $ticket): ?>
-        <tr data-id="<?php echo $ticket['id']; ?>"
-            class="<?php
-              echo $ticket['estado'] === 'Fechado' ? 'status-closed ' : '';
-              echo $ticket['prioridade'] === 'Critico' ? 'priority-critical ' : '';
-              echo $ticket['prioridade'] === 'Alto' ? 'priority-high ' : '';
-            ?>">
-          <td><?php echo $ticket['id']; ?></td>
-          <td><?php echo htmlspecialchars($ticket['titulo']); ?></td>
-          <td data-field="estado"><?php echo $ticket['estado']; ?></td>
-          <td data-field="prioridade"><?php echo $ticket['prioridade']; ?></td>
-          <td><?php echo $ticket['tipo']; ?></td>
-          <td><a href="ticket.php?id=<?php echo $ticket['id']; ?>" class="action-link">Ver Detalhes</a></td>
+        <?php
+          $ticketId = (int) ($ticket['id'] ?? 0);
+          $rowClasses = [];
+          if (($ticket['estado'] ?? '') === 'Fechado') {
+              $rowClasses[] = 'status-closed';
+          }
+          if (($ticket['prioridade'] ?? '') === 'Critico') {
+              $rowClasses[] = 'priority-critical';
+          }
+          if (($ticket['prioridade'] ?? '') === 'Alto') {
+              $rowClasses[] = 'priority-high';
+          }
+          $rowClassAttr = $rowClasses ? ' class="' . e(implode(' ', $rowClasses)) . '"' : '';
+        ?>
+        <tr data-id="<?php echo $ticketId; ?>"<?php echo $rowClassAttr; ?>>
+          <td><?php echo $ticketId; ?></td>
+          <td><?php echo e($ticket['titulo'] ?? ''); ?></td>
+          <td data-field="estado"><?php echo e($ticket['estado'] ?? ''); ?></td>
+          <td data-field="prioridade"><?php echo e($ticket['prioridade'] ?? ''); ?></td>
+          <td><?php echo e($ticket['tipo'] ?? ''); ?></td>
+          <td><a href="ticket.php?id=<?php echo $ticketId; ?>" class="action-link">Ver Detalhes</a></td>
         </tr>
       <?php endforeach; ?>
 

@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  web:
+    read_only: false
+    tmpfs: []
+    volumes:
+      - ./:/var/www/html:rw
+  gateway:
+    read_only: false
+    tmpfs: []
+    volumes:
+      - ./services/gateway:/app:rw
+      - ./shared:/app/shared:rw
+  tickets:
+    read_only: false
+    tmpfs: []
+    volumes:
+      - ./services/tickets:/app:rw
+      - ./shared:/app/shared:rw
+  stats:
+    read_only: false
+    tmpfs: []
+    volumes:
+      - ./services/stats:/app:rw
+      - ./shared:/app/shared:rw

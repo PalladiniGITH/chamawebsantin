@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'inc/connect.php';
+require_once __DIR__ . '/inc/security.php';
 
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -89,7 +90,7 @@ $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
               <select id="categoria_id" name="categoria_id" required>
                 <option value="">-- Selecione --</option>
                 <?php foreach($categorias as $cat): ?>
-                  <option value="<?php echo $cat['id']; ?>"><?php echo $cat['nome']; ?></option>
+                  <option value="<?php echo (int) ($cat['id'] ?? 0); ?>"><?php echo e($cat['nome'] ?? ''); ?></option>
                 <?php endforeach; ?>
               </select>
               <div class="error-message">Por favor, selecione uma categoria.</div>
@@ -131,7 +132,7 @@ $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
                 <select id="assigned_to" name="assigned_to">
                   <option value="">-- Ninguém --</option>
                   <?php foreach($analistas as $an): ?>
-                    <option value="<?php echo $an['id']; ?>"><?php echo $an['nome']; ?></option>
+                    <option value="<?php echo (int) ($an['id'] ?? 0); ?>"><?php echo e($an['nome'] ?? ''); ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
@@ -141,7 +142,7 @@ $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
                 <select id="assigned_team" name="assigned_team">
                   <option value="">-- Nenhuma --</option>
                   <?php foreach($teams as $tm): ?>
-                    <option value="<?php echo $tm['id']; ?>"><?php echo $tm['nome']; ?></option>
+                    <option value="<?php echo (int) ($tm['id'] ?? 0); ?>"><?php echo e($tm['nome'] ?? ''); ?></option>
                   <?php endforeach; ?>
                 </select>
               </div>
@@ -153,7 +154,7 @@ $teams = $stmtTeams->fetchAll(PDO::FETCH_ASSOC);
             </div>
           <?php endif; ?>
 
-          <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($user_id); ?>">
+          <input type="hidden" name="user_id" value="<?php echo (int) $user_id; ?>">
 
           <div class="form-actions">
             <button type="submit" id="submit-button" class="action-button">Abrir Chamado</button>

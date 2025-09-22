@@ -1,13 +1,45 @@
 <?php
-$host = 'db';
-$db   = 'chamaweb';
-$user = 'root';
-$pass = 'root';
+$host = getenv('DATABASE_HOST') ?: '192.168.8.34';
+$port = getenv('DATABASE_PORT') ?: '3306';
+$db   = getenv('DATABASE_NAME') ?: 'chamaweb';
+$user = getenv('DATABASE_USER');
+$pass = getenv('DATABASE_PASSWORD');
+$missingVars = [];
+
+if ($user === false || $user === '') {
+    $missingVars[] = 'DATABASE_USER';
+}
+
+if ($pass === false || $pass === '') {
+    $missingVars[] = 'DATABASE_PASSWORD';
+}
+
+if ($missingVars) {
+    error_log('Variáveis de credencial ausentes: ' . implode(', ', $missingVars));
+    throw new RuntimeException('Credenciais do banco de dados não configuradas.');
+}
+
+$user = (string) $user;
+$pass = (string) $pass;
+$ca   = getenv('MYSQL_SSL_CA') ?: '';
+
+$dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $db);
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+];
+
+if (!empty($ca)) {
+    if (file_exists($ca) && defined('PDO::MYSQL_ATTR_SSL_CA')) {
+        $options[PDO::MYSQL_ATTR_SSL_CA] = $ca;
+    } else {
+        error_log('MYSQL_SSL_CA definido, mas arquivo não encontrado ou suporte PDO ausente: ' . $ca);
+    }
+}
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo = new PDO($dsn, $user, $pass, $options);
 } catch (PDOException $e) {
-    echo "Erro ao conectar: " . $e->getMessage();
-    exit;
+    error_log('DB connection failed: ' . $e->getMessage());
+    throw $e;
 }
