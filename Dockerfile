@@ -57,10 +57,13 @@ COPY --from=builder /app /var/www/html
 COPY --from=builder /app/docker/apache/start-apache.sh /usr/local/bin/start-apache.sh
 RUN chmod +x /usr/local/bin/start-apache.sh
 
-# Ensure Apache runs as www-data and files have restrictive permissions by default
+# Ensure Apache runs as www-data and files stay readable even when bind-mounted
+# for development. Directories remain non-writable while files keep world-read
+# permission so Apache can traverse and serve the application without tripping
+# 403 errors when host ownership differs.
 RUN chown -R www-data:www-data /var/www/html \
-    && find /var/www/html -type f -exec chmod 640 {} \; \
-    && find /var/www/html -type d -exec chmod 750 {} \;
+    && find /var/www/html -type f -exec chmod 644 {} \; \
+    && find /var/www/html -type d -exec chmod 755 {} \;
 
 WORKDIR /var/www/html
 
