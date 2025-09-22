@@ -1,5 +1,5 @@
 # --- Builder stage: install composer and PHP dependencies in isolation
-FROM php:8.4.13RC1-cli AS builder
+FROM php:7.4-cli AS builder
 WORKDIR /app
 
 # Install only the utilities required for composer in this throwaway stage
@@ -27,7 +27,7 @@ RUN mkdir -p /app/uploads /app/tmp
 
 
 # --- Runtime stage: lightweight Apache + PHP image without build tooling
-FROM php:8.4.13RC1-apache
+FROM php:7.4-apache
 ENV APACHE_DOCUMENT_ROOT /var/www/html
 
 # Install runtime dependencies and PHP extensions, removing build libraries afterwards

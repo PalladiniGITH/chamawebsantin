@@ -1,4 +1,4 @@
-FROM php:8.4.13RC1-cli
+FROM php:7.4-cli
 RUN docker-php-ext-install pdo pdo_mysql
 WORKDIR /app
 # Copia apenas os arquivos do gateway e o diretório compartilhado
