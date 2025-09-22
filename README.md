@@ -7,40 +7,104 @@ Este projeto demonstra uma arquitetura simples de microserviços em PHP. Os serv
 - **gateway**: expõe as rotas públicas e encaminha as requisições para os microserviços internos.
 - **tickets**: responsável pelo gerenciamento de chamados.
 - **stats**: fornece estatísticas agregadas usadas na página de relatórios.
-- **db**: banco de dados MySQL compartilhado entre os serviços.
-- **shared/connect.php**: script único de conexão ao banco utilizado pelos serviços.
+- **db_check**: rotina auxiliar que aguarda a disponibilidade do MySQL externo antes de liberar os demais serviços.
+- **shared/connect.php**: script único de conexão ao banco utilizado pelos serviços (lê as variáveis de ambiente).
 - **front-end**: arquivos PHP e recursos estáticos servidos na raiz do projeto.
+- **MySQL externo (192.168.8.34)**: banco compartilhado por todos os serviços, executado fora da DMZ.
+
+## Pré-requisitos
+
+1. Um servidor MySQL acessível a partir da rede da DMZ, ouvindo em `192.168.8.34:3306` (ajuste os valores se necessário).
+2. Um banco de dados criado para a aplicação (ex.: `chamaweb`) e um usuário com privilégios adequados (ex.: `app_user`).
+3. Certificados TLS para o Apache disponíveis em `certs/server.crt` e `certs/server.key` (ou configure variáveis para apontar outros caminhos). Opcionalmente, um arquivo de cadeia (`certs/ca.crt`).
+4. (Opcional) Certificado da autoridade certificadora (`ca.crt`) emitente do MySQL caso a conexão precise usar TLS.
+
+## Configuração
+
+1. Crie um arquivo `.env` (fora do controle de versão) contendo as variáveis de ambiente necessárias para o Compose. O formato segue o padrão `KEY=valor`. Defina credenciais exclusivas do ambiente e armazene o arquivo com permissões restritas.
+
+   Principais variáveis:
+
+   - `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`: apontam para o MySQL externo. Utilize usuário e senha gerados especificamente para a aplicação.
+   - `MYSQL_SSL_CA`: caminho absoluto dentro do contêiner para o certificado da CA do MySQL (ex.: `/certs/ca.crt`). Deixe em branco para conexões sem TLS — cenário padrão no momento.
+   - `APACHE_SSL_CERT_FILE`, `APACHE_SSL_KEY_FILE`, `APACHE_SSL_CHAIN_FILE`, `APACHE_SSL_REQUIRE_CUSTOM_CERT`: configuram o material TLS usado pelo Apache na porta 8443.
+
+   > **Observação:** o `docker-compose.yml` aplica por padrão `DATABASE_USER=app_user` e `DATABASE_PASSWORD=08^8nG0E9U@a` para facilitar os testes. Em produção, defina valores próprios via `.env` ou variáveis de ambiente antes de executar o Compose.
+
+2. Se utilizar TLS no MySQL, copie o certificado da CA para o diretório `certs/` (ou outro local montado no contêiner) e informe o caminho na variável `MYSQL_SSL_CA`. Em cada cliente (Kali, navegadores etc.), importe o mesmo certificado de CA para que a validação ocorra sem alertas.
+
+3. Garanta que o usuário configurado no `.env` possua permissão de leitura e escrita no banco selecionado. O script `script_sql.sql` pode ser executado manualmente no servidor MySQL para criar a estrutura inicial.
 
 ## Executando
 
-Utilize o `docker-compose` para subir todos os serviços. O script `script_sql.sql` 
-será executado automaticamente no primeiro start do banco, populando a tabela de
-exemplo com um usuário administrador.
-
-Credenciais padrão: `admin@sistema.com` / `admin123` (armazenada como hash SHA-256).
+Utilize o `docker-compose` para subir todos os serviços. O serviço `db_check` ficará em loop até que a porta `DATABASE_PORT` do host `DATABASE_HOST` esteja acessível.
 
 ```bash
 docker-compose up --build
 ```
 
-O serviço **web** utiliza o diretório do projeto como DocumentRoot. O arquivo `index.php` exibe a página de login.
+O serviço **web** utiliza o diretório do projeto como DocumentRoot. O portal web pode ser acessado exclusivamente em `https://localhost:8443` (ajuste o host conforme o ambiente). Apenas a porta 8443 é exposta; gateway, tickets e stats permanecem restritos à rede interna do Docker.
 
-O portal web pode ser acessado em `http://localhost:8080`.
-O API Gateway estará em `http://localhost:8081` e fará a mediação das chamadas para os demais serviços.
-O contêiner `web` possui um certificado autoassinado configurado no Apache,
-permitindo acesso seguro em `https://localhost:8443`. O navegador exibirá um aviso
-de conexão não segura; aceite o risco para prosseguir nos testes locais.
+### Endurecimento dos contêineres
 
-Para fazer login utilize `http://localhost:8080/` ou `https://localhost:8443/`.
+- A imagem do Apache/PHP agora é construída em múltiplas etapas: o Composer e ferramentas como `git` e `unzip` ficam isolados no estágio `builder`, evitando que utilitários desnecessários existam na imagem final.
+- Os serviços rodam com `read_only: true`, `cap_drop: ["ALL"]` e `security_opt: no-new-privileges:true`. Assim, mesmo que uma vulnerabilidade permita execução remota, não é possível gravar no filesystem raiz nem elevar privilégios.
+- Diretórios que precisam de escrita (`/run/apache2`, `uploads`, `tmp`, `sessions`) são montados como `tmpfs` com cotas e permissões restritivas (`uid=33`, `mode=0770/1733`). Caso seja necessário persistir anexos ou outros artefatos, substitua o `tmpfs` correspondente por um volume nomeado seguro (ex.: `- uploads-data:/var/www/html/uploads:rw,noexec,nosuid`).
+- Healthchecks baseados em `php -r 'fsockopen(...)'` monitoram a disponibilidade dos serviços sem exigir utilitários extras como `curl` ou `nc` dentro dos contêineres.
+
+### Configurando o certificado HTTPS
+
+1. Gere ou obtenha um certificado válido para o host que responderá em `https://localhost:8443`.
+   No pfSense, utilize a autoridade certificadora interna e exporte o certificado e a chave
+   privada em formato PEM.
+2. Salve os arquivos no diretório `certs/` da raiz do projeto como `server.crt` (cadeia ou
+   fullchain) e `server.key`. Um arquivo de cadeia separado também pode ser informado via
+   variável `APACHE_SSL_CHAIN_FILE`.
+3. (Opcional) Ajuste o arquivo `.env` para apontar outros caminhos (ou liberar o uso de
+   autoassinados), caso utilize nomes diferentes:
+
+   ```env
+   # Defina "true" se quiser bloquear o fallback para certificados autoassinados.
+   APACHE_SSL_REQUIRE_CUSTOM_CERT=false
+   APACHE_SSL_CERT_FILE=/certs/meu-certificado.pem
+   APACHE_SSL_KEY_FILE=/certs/minha-chave.key
+   APACHE_SSL_CHAIN_FILE=/certs/ca-intermediaria.pem
+   ```
+
+4. Suba os serviços novamente com `docker-compose up --build`. O script de inicialização
+   detectará os arquivos e configurará o Apache automaticamente. Se estiver usando o
+   modo estrito (`APACHE_SSL_REQUIRE_CUSTOM_CERT=true`) e algum arquivo estiver ausente,
+   o contêiner do Apache encerrará com uma mensagem indicando os caminhos esperados
+   (verifique com `docker-compose logs web`). Com o modo padrão (`false`), ele gerará
+   um certificado autoassinado temporário para que você possa finalizar os testes.
+
+Com essa configuração, os navegadores reconhecerão o certificado como confiável assim que o
+certificado da autoridade emissora estiver instalado no ambiente.
+
+### Fluxo para desenvolvimento local
+
+O endurecimento acima torna o filesystem das imagens somente leitura. Para editar o código em tempo real durante o desenvolvimento, utilize o arquivo auxiliar `docker-compose.dev.yml`, que monta o código-fonte como volume e desabilita os `tmpfs` temporários:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+No arquivo de override, ajuste os volumes conforme necessário (por exemplo, para montar diretórios específicos em vez da raiz inteira) e, se precisar preservar anexos entre reinicializações, troque o `tmpfs` por um volume persistente apontando para o host de desenvolvimento.
+
+### Observações sobre o MySQL externo
+
+- phpMyAdmin não é mais provisionado neste compose para evitar exposição indevida na DMZ. Caso precise utilizá-lo, rode-o apenas na rede interna.
+- Para administração manual, conecte-se diretamente ao servidor MySQL da rede interna (por exemplo, `mysql -h 192.168.8.34 -u app_user -p`).
+- Certifique-se de liberar o host/porta no firewall para a rede onde os contêineres rodam.
 
 ## Endpoints
 
- Ao acessar o endereço acima, você verá uma mensagem com os caminhos disponíveis.
+Ao acessar o endereço acima, você verá uma mensagem com os caminhos disponíveis.
 
- - `http://localhost:8081/tickets` - API de gerenciamento de chamados
- - `http://localhost:8081/stats` - API de estatísticas para o relatório
-   (também acessíveis via HTTPS em `https://localhost:8443/api/...`)
-- `api/create_ticket.php` - proxy que envia o formulario de novo chamado ao gateway, evitando problemas de CORS.
+- `https://localhost:8443/api/tickets.php` - proxy que expõe as operações do gateway pela porta segura
+- `https://localhost:8443/api_stats.php` - endpoint HTTPS para o microserviço de estatísticas
+  (internamente, ambos os scripts utilizam `http://gateway/` para chegar aos microserviços)
+- `api/create_ticket.php` - proxy que envia o formulário de novo chamado ao gateway, evitando problemas de CORS.
 
 ## Verificando o gateway
 
@@ -50,7 +114,7 @@ Para acompanhar as requisições encaminhadas pelo gateway, execute:
 docker-compose logs -f gateway
 ```
 
-Cada requisição gera uma linha de log indicando o método, a rota recebida e o serviço interno escolhido. Você também pode acessar `http://localhost:8081/` e verificar se a mensagem JSON apresenta os caminhos `/tickets` e `/stats`.
+Cada requisição gera uma linha de log indicando o método, a rota recebida e o serviço interno escolhido.
 
 ## Segurança e Manutenção
 
@@ -59,8 +123,6 @@ Ao autenticar, um token JWT é gerado e armazenado na sessão. Esse token
 é enviado no header `Authorization` para que o gateway repasse a
 requisição aos microserviços.
 
-Um script `backup_db.sh` está disponível para gerar backups da base MySQL. Você pode agendar sua execução diária via cron. Há também o utilitário `sla_monitor.php` que dispara notificações antes do vencimento do SLA dos chamados.
+O utilitário `sla_monitor.php` dispara notificações antes do vencimento do SLA dos chamados.
 
 Todos os acessos e ações relevantes são registrados na tabela `logs` do banco de dados, permitindo auditoria completa.
-
-
