@@ -1,3 +1,10 @@
+<?php
+session_start();
+require_once __DIR__ . '/inc/security.php';
+
+$loginError = $_SESSION['login_error'] ?? '';
+unset($_SESSION['login_error']);
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -9,7 +16,7 @@
   <link rel="stylesheet" href="/css/enhanced.css" />
   <link rel="stylesheet" href="/css/theme.css" />
 </head>
-<body>
+<body<?php if ($loginError !== ''): ?> data-login-error="<?= e($loginError) ?>"<?php endif; ?>>
   <div class="login-container">
     <div class="login-logo">
       <img src="img/logo-chamados.svg" alt="Portal de Chamados" onerror="this.src='data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22100%22%20height%3D%22100%22%20viewBox%3D%220%200%20100%20100%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2245%22%20fill%3D%22%23222%22%20stroke%3D%22%23ffe300%22%20stroke-width%3D%225%22%2F%3E%3Ctext%20x%3D%2250%22%20y%3D%2255%22%20font-family%3D%22Arial%22%20font-size%3D%2220%22%20text-anchor%3D%22middle%22%20fill%3D%22%23ffe300%22%3ESupport%3C%2Ftext%3E%3C%2Fsvg%3E'; this.style.width='100px'" />
@@ -23,6 +30,9 @@
     </div>
     
     <div class="login-forms">
+      <?php if ($loginError !== ''): ?>
+        <div class="login-error"><?= e($loginError) ?></div>
+      <?php endif; ?>
       <!-- Form de login tradicional , esta incorreto -->
       <!--<form action="dashboard.php" method="POST" id="traditional-form" class="login-form active"> -->
       <form action="/login.php" method="POST" id="traditional-form" class="login-form active">
@@ -134,25 +144,25 @@
       });
     }
     
-    // Verificar se há erro na URL
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('erro')) {
-      showLoginError();
+
+    const serverError = document.body.getAttribute('data-login-error');
+    if (serverError) {
+      showLoginError(serverError);
     }
     
     // Função para mostrar erro de login
-    function showLoginError() {
+    function showLoginError(message) {
       let errorBox = document.querySelector('.login-error');
       if (!errorBox) {
         errorBox = document.createElement('div');
         errorBox.className = 'login-error';
-        errorBox.textContent = 'E-mail ou senha incorretos';
-        
         const loginForms = document.querySelector('.login-forms');
         if (loginForms) {
           loginForms.insertBefore(errorBox, loginForms.firstChild);
         }
       }
+      errorBox.textContent = message || 'Usuário ou senha inválidos.';
     }
     
     // Função para esconder erro de login

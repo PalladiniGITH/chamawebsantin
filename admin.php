@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'inc/connect.php';
+require_once __DIR__ . '/inc/security.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'administrador') {
     header('Location: index.php');
@@ -9,69 +10,97 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'administrador') {
 
 // Gerenciamento de usuários
 if (isset($_POST['acao']) && $_POST['acao'] === 'criar_usuario') {
-    $nome  = $_POST['nome'] ?? '';
-    $email = $_POST['email'] ?? '';
+    $nome  = trim($_POST['nome'] ?? '');
+    $emailInput = trim($_POST['email'] ?? '');
+    $emailValid = filter_var($emailInput, FILTER_VALIDATE_EMAIL);
+    $email = $emailValid ? strtolower($emailValid) : null;
     $senha = $_POST['senha'] ?? '';
-    $senhaHash = hash('sha256', $senha);
     $role  = $_POST['role']  ?? 'usuario';
+
+    $allowedRoles = ['usuario', 'analista', 'administrador'];
+    if (!in_array($role, $allowedRoles, true)) {
+        $role = 'usuario';
+    }
+
+    if ($nome === '' || !$email || $senha === '') {
+        $_SESSION['admin_message'] = 'Preencha todos os campos obrigatórios com dados válidos.';
+        $_SESSION['admin_message_type'] = 'error';
+        header('Location: admin.php');
+        exit;
+    }
+
+    $senhaHash = hash('sha256', $senha);
 
     $stmt = $pdo->prepare("INSERT INTO users (nome,email,senha,role) VALUES (:n,:e,:s,:r)");
     $stmt->execute(['n'=>$nome, 'e'=>$email, 's'=>$senhaHash, 'r'=>$role]);
-    
+
     // Mensagem de sucesso via sessão
     $_SESSION['admin_message'] = 'Usuário criado com sucesso!';
     $_SESSION['admin_message_type'] = 'success';
-    
+
     // Redirecionar para evitar resubmissão em F5
     header('Location: admin.php');
     exit;
 }
 
 if (isset($_GET['block_user'])) {
-    $uid = $_GET['block_user'];
-    $stmt = $pdo->prepare("UPDATE users SET blocked=1 WHERE id=:id");
-    $stmt->execute(['id'=>$uid]);
-    
-    $_SESSION['admin_message'] = 'Usuário bloqueado com sucesso!';
-    $_SESSION['admin_message_type'] = 'warning';
-    
+    $uid = filter_input(INPUT_GET, 'block_user', FILTER_VALIDATE_INT);
+    if ($uid) {
+        $stmt = $pdo->prepare("UPDATE users SET blocked=1 WHERE id=:id");
+        $stmt->execute(['id'=>$uid]);
+
+        $_SESSION['admin_message'] = 'Usuário bloqueado com sucesso!';
+        $_SESSION['admin_message_type'] = 'warning';
+    }
+
     header('Location: admin.php');
     exit;
 }
 
 if (isset($_GET['unblock_user'])) {
-    $uid = $_GET['unblock_user'];
-    $stmt = $pdo->prepare("UPDATE users SET blocked=0 WHERE id=:id");
-    $stmt->execute(['id'=>$uid]);
-    
-    $_SESSION['admin_message'] = 'Usuário desbloqueado com sucesso!';
-    $_SESSION['admin_message_type'] = 'success';
-    
+    $uid = filter_input(INPUT_GET, 'unblock_user', FILTER_VALIDATE_INT);
+    if ($uid) {
+        $stmt = $pdo->prepare("UPDATE users SET blocked=0 WHERE id=:id");
+        $stmt->execute(['id'=>$uid]);
+
+        $_SESSION['admin_message'] = 'Usuário desbloqueado com sucesso!';
+        $_SESSION['admin_message_type'] = 'success';
+    }
+
     header('Location: admin.php');
     exit;
 }
 
 // Gerenciamento de categorias (RF11)
 if (isset($_POST['acao']) && $_POST['acao']==='criar_categoria') {
-    $catNome = $_POST['cat_nome'] ?? '';
+    $catNome = trim($_POST['cat_nome'] ?? '');
+    if ($catNome === '') {
+        $_SESSION['admin_message'] = 'Informe um nome válido para a categoria.';
+        $_SESSION['admin_message_type'] = 'error';
+        header('Location: admin.php');
+        exit;
+    }
+
     $stmtCat = $pdo->prepare("INSERT INTO categories (nome) VALUES (:n)");
     $stmtCat->execute(['n'=>$catNome]);
-    
+
     $_SESSION['admin_message'] = 'Categoria criada com sucesso!';
     $_SESSION['admin_message_type'] = 'success';
-    
+
     header('Location: admin.php');
     exit;
 }
 
 if (isset($_GET['del_cat'])) {
-    $catId = $_GET['del_cat'];
-    $stmtDC = $pdo->prepare("DELETE FROM categories WHERE id=:id");
-    $stmtDC->execute(['id'=>$catId]);
-    
-    $_SESSION['admin_message'] = 'Categoria excluída com sucesso!';
-    $_SESSION['admin_message_type'] = 'warning';
-    
+    $catId = filter_input(INPUT_GET, 'del_cat', FILTER_VALIDATE_INT);
+    if ($catId) {
+        $stmtDC = $pdo->prepare("DELETE FROM categories WHERE id=:id");
+        $stmtDC->execute(['id'=>$catId]);
+
+        $_SESSION['admin_message'] = 'Categoria excluída com sucesso!';
+        $_SESSION['admin_message_type'] = 'warning';
+    }
+
     header('Location: admin.php');
     exit;
 }
@@ -117,9 +146,13 @@ $cats = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <?php if (isset($_SESSION['admin_message'])): ?>
-    <div class="admin-notification <?php echo $_SESSION['admin_message_type'] ?? 'info'; ?>">
-      <?php echo $_SESSION['admin_message']; ?>
-      <?php unset($_SESSION['admin_message']); unset($_SESSION['admin_message_type']); ?>
+    <?php
+      $adminMessage = $_SESSION['admin_message'];
+      $adminMessageType = $_SESSION['admin_message_type'] ?? 'info';
+      unset($_SESSION['admin_message'], $_SESSION['admin_message_type']);
+    ?>
+    <div class="admin-notification <?php echo e(sanitize_class_token($adminMessageType)); ?>">
+      <?php echo e($adminMessage); ?>
     </div>
     <?php endif; ?>
     
@@ -189,12 +222,12 @@ $cats = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
               <tbody>
                 <?php foreach($usuarios as $u): ?>
                 <tr>
-                  <td><?php echo $u['id']; ?></td>
-                  <td><?php echo htmlspecialchars($u['nome']); ?></td>
-                  <td><?php echo htmlspecialchars($u['email']); ?></td>
+                  <td><?php echo (int) ($u['id'] ?? 0); ?></td>
+                  <td><?php echo e($u['nome'] ?? ''); ?></td>
+                  <td><?php echo e($u['email'] ?? ''); ?></td>
                   <td>
-                    <span class="badge badge-<?php echo $u['role']; ?>">
-                      <?php echo ucfirst($u['role']); ?>
+                    <span class="badge <?php echo e(sanitize_class_token($u['role'] ?? '', 'badge-')); ?>">
+                      <?php echo e(ucfirst($u['role'] ?? '')); ?>
                     </span>
                   </td>
                   <td>
@@ -206,13 +239,13 @@ $cats = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
                   </td>
                   <td class="action-column">
                     <?php if (!$u['blocked']): ?>
-                      <a href="?block_user=<?php echo $u['id']; ?>" 
-                         class="action-button small-button warning-button" 
+                      <a href="?block_user=<?php echo (int) ($u['id'] ?? 0); ?>"
+                         class="action-button small-button warning-button"
                          onclick="return confirm('Tem certeza que deseja bloquear este usuário?')">
                         Bloquear
                       </a>
                     <?php else: ?>
-                      <a href="?unblock_user=<?php echo $u['id']; ?>" 
+                      <a href="?unblock_user=<?php echo (int) ($u['id'] ?? 0); ?>"
                          class="action-button small-button success-button">
                         Desbloquear
                       </a>
@@ -252,9 +285,9 @@ $cats = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
                 <?php foreach($cats as $c): ?>
                   <li>
                     <div class="category-item">
-                      <span class="category-name"><?php echo htmlspecialchars($c['nome']); ?></span>
-                      <a href="?del_cat=<?php echo $c['id']; ?>" 
-                         class="delete-button" 
+                      <span class="category-name"><?php echo e($c['nome'] ?? ''); ?></span>
+                      <a href="?del_cat=<?php echo (int) ($c['id'] ?? 0); ?>"
+                         class="delete-button"
                          onclick="return confirm('Tem certeza que deseja excluir esta categoria?')">
                         ×
                       </a>

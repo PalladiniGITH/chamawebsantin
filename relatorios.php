@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'inc/connect.php';
+require_once __DIR__ . '/inc/security.php';
 
 if (!isset($_SESSION['user_id']) || !in_array($_SESSION['role'], ['analista','administrador'])) {
     header('Location: index.php');
@@ -85,22 +86,22 @@ $topCategorias = $data['top_categorias'] ?? [];
   <!-- Cards de indicadores -->
   <div class="indicators">
     <div class="card indicator-card">
-      <div class="indicator-value"><?php echo $totalChamados; ?></div>
+      <div class="indicator-value"><?php echo (int) $totalChamados; ?></div>
       <div class="indicator-label">Total de Chamados</div>
     </div>
     
     <div class="card indicator-card">
-      <div class="indicator-value"><?php echo $abertos; ?></div>
+      <div class="indicator-value"><?php echo (int) $abertos; ?></div>
       <div class="indicator-label">Chamados em Aberto</div>
     </div>
     
     <div class="card indicator-card">
-      <div class="indicator-value"><?php echo $fechados; ?></div>
+      <div class="indicator-value"><?php echo (int) $fechados; ?></div>
       <div class="indicator-label">Chamados Fechados</div>
     </div>
     
     <div class="card indicator-card">
-      <div class="indicator-value"><?php echo $mediaHoras; ?></div>
+      <div class="indicator-value"><?php echo e(is_numeric($mediaHoras) ? number_format((float) $mediaHoras, 2, ',', '.') : '0'); ?></div>
       <div class="indicator-label">Tempo Médio (horas)</div>
     </div>
   </div>
