@@ -29,7 +29,7 @@ Este projeto demonstra uma arquitetura simples de microserviços em PHP. Os serv
    - `MYSQL_SSL_CA`: caminho absoluto dentro do contêiner para o certificado da CA do MySQL (ex.: `/certs/ca.crt`). Deixe em branco para conexões sem TLS — cenário padrão no momento.
    - `APACHE_SSL_CERT_FILE`, `APACHE_SSL_KEY_FILE`, `APACHE_SSL_CHAIN_FILE`, `APACHE_SSL_REQUIRE_CUSTOM_CERT`: configuram o material TLS usado pelo Apache na porta 8443.
 
-   > **Observação:** o `docker-compose.yml` exige que `DATABASE_USER` e `DATABASE_PASSWORD` estejam definidos; o Compose interromperá a execução caso alguma dessas variáveis não exista, evitando o uso de credenciais padrão.
+   > **Observação:** o `docker-compose.yml` aplica por padrão `DATABASE_USER=app_user` e `DATABASE_PASSWORD=08^8nG0E9U@a` para facilitar os testes. Em produção, defina valores próprios via `.env` ou variáveis de ambiente antes de executar o Compose.
 
 2. Se utilizar TLS no MySQL, copie o certificado da CA para o diretório `certs/` (ou outro local montado no contêiner) e informe o caminho na variável `MYSQL_SSL_CA`. Em cada cliente (Kali, navegadores etc.), importe o mesmo certificado de CA para que a validação ocorra sem alertas.
 
