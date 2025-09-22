@@ -3,7 +3,7 @@ $host = getenv('DATABASE_HOST') ?: '192.168.8.34';
 $port = getenv('DATABASE_PORT') ?: '3306';
 $db   = getenv('DATABASE_NAME') ?: 'chamaweb';
 $user = getenv('DATABASE_USER') ?: 'app_user';
-$pass = getenv('DATABASE_PASSWORD') ?: 'app_password';
+$pass = getenv('DATABASE_PASSWORD') ?: '08^8nG0E9U@a';
 $ca   = getenv('MYSQL_SSL_CA') ?: '';
 
 $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $db);

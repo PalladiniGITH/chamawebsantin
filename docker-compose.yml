@@ -17,7 +17,7 @@ services:
       DATABASE_PORT: ${DATABASE_PORT:-3306}
       DATABASE_NAME: ${DATABASE_NAME:-chamaweb}
       DATABASE_USER: ${DATABASE_USER:-app_user}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-app_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-08^8nG0E9U@a}
       MYSQL_SSL_CA: ${MYSQL_SSL_CA:-}
     volumes:
       - ./certs:/certs:ro
@@ -35,7 +35,7 @@ services:
       DATABASE_PORT: ${DATABASE_PORT:-3306}
       DATABASE_NAME: ${DATABASE_NAME:-chamaweb}
       DATABASE_USER: ${DATABASE_USER:-app_user}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-app_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-08^8nG0E9U@a}
       MYSQL_SSL_CA: ${MYSQL_SSL_CA:-}
     depends_on:
       - db_check
@@ -52,7 +52,7 @@ services:
       DATABASE_PORT: ${DATABASE_PORT:-3306}
       DATABASE_NAME: ${DATABASE_NAME:-chamaweb}
       DATABASE_USER: ${DATABASE_USER:-app_user}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-app_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-08^8nG0E9U@a}
       MYSQL_SSL_CA: ${MYSQL_SSL_CA:-}
     depends_on:
       - db_check
@@ -67,7 +67,7 @@ services:
       DATABASE_PORT: ${DATABASE_PORT:-3306}
       DATABASE_NAME: ${DATABASE_NAME:-chamaweb}
       DATABASE_USER: ${DATABASE_USER:-app_user}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-app_password}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-08^8nG0E9U@a}
       MYSQL_SSL_CA: ${MYSQL_SSL_CA:-}
     depends_on:
       - db_check

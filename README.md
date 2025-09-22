@@ -30,8 +30,8 @@ Este projeto demonstra uma arquitetura simples de microserviços em PHP. Os serv
 
    Principais variáveis:
 
-   - `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`: apontam para o MySQL externo.
-   - `MYSQL_SSL_CA`: caminho absoluto dentro do contêiner para o certificado da CA do MySQL (ex.: `/certs/ca.crt`). Deixe em branco para conexões sem TLS.
+   - `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`: apontam para o MySQL externo. O exemplo já traz a senha atual (`08^8nG0E9U@a`); altere-a conforme políticas internas.
+   - `MYSQL_SSL_CA`: caminho absoluto dentro do contêiner para o certificado da CA do MySQL (ex.: `/certs/ca.crt`). Deixe em branco para conexões sem TLS — cenário padrão no momento.
    - `APACHE_SSL_CERT_FILE`, `APACHE_SSL_KEY_FILE`, `APACHE_SSL_CHAIN_FILE`, `APACHE_SSL_REQUIRE_CUSTOM_CERT`: configuram o material TLS usado pelo Apache na porta 8443.
 
 2. Se utilizar TLS no MySQL, copie o certificado da CA para o diretório `certs/` (ou outro local montado no contêiner) e informe o caminho na variável `MYSQL_SSL_CA`. Em cada cliente (Kali, navegadores etc.), importe o mesmo certificado de CA para que a validação ocorra sem alertas.
