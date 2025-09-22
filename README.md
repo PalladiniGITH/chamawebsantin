@@ -21,18 +21,15 @@ Este projeto demonstra uma arquitetura simples de microserviços em PHP. Os serv
 
 ## Configuração
 
-1. Copie o arquivo `.env.example` para `.env` e ajuste os valores das variáveis de ambiente de acordo com o seu ambiente:
-
-   ```bash
-   cp .env.example .env
-   vim .env
-   ```
+1. Crie um arquivo `.env` (fora do controle de versão) contendo as variáveis de ambiente necessárias para o Compose. O formato segue o padrão `KEY=valor`. Defina credenciais exclusivas do ambiente e armazene o arquivo com permissões restritas.
 
    Principais variáveis:
 
-   - `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`: apontam para o MySQL externo. O exemplo já traz a senha atual (`08^8nG0E9U@a`); altere-a conforme políticas internas.
+   - `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`: apontam para o MySQL externo. Utilize usuário e senha gerados especificamente para a aplicação.
    - `MYSQL_SSL_CA`: caminho absoluto dentro do contêiner para o certificado da CA do MySQL (ex.: `/certs/ca.crt`). Deixe em branco para conexões sem TLS — cenário padrão no momento.
    - `APACHE_SSL_CERT_FILE`, `APACHE_SSL_KEY_FILE`, `APACHE_SSL_CHAIN_FILE`, `APACHE_SSL_REQUIRE_CUSTOM_CERT`: configuram o material TLS usado pelo Apache na porta 8443.
+
+   > **Observação:** o `docker-compose.yml` exige que `DATABASE_USER` e `DATABASE_PASSWORD` estejam definidos; o Compose interromperá a execução caso alguma dessas variáveis não exista, evitando o uso de credenciais padrão.
 
 2. Se utilizar TLS no MySQL, copie o certificado da CA para o diretório `certs/` (ou outro local montado no contêiner) e informe o caminho na variável `MYSQL_SSL_CA`. Em cada cliente (Kali, navegadores etc.), importe o mesmo certificado de CA para que a validação ocorra sem alertas.
 
@@ -47,18 +44,6 @@ docker-compose up --build
 ```
 
 O serviço **web** utiliza o diretório do projeto como DocumentRoot. O portal web pode ser acessado exclusivamente em `https://localhost:8443` (ajuste o host conforme o ambiente). Apenas a porta 8443 é exposta; gateway, tickets e stats permanecem restritos à rede interna do Docker.
-
-Para validar conectividade com o banco antes ou depois de subir os contêineres, execute o script de teste manual:
-
-```bash
-./scripts/test-db-conn.sh
-```
-
-Se desejar sobrescrever o host/porta temporariamente, utilize variáveis de ambiente ao chamar o script:
-
-```bash
-DATABASE_HOST=192.168.8.34 DATABASE_PORT=3306 ./scripts/test-db-conn.sh
-```
 
 ### Configurando o certificado HTTPS
 
@@ -121,7 +106,6 @@ Ao autenticar, um token JWT é gerado e armazenado na sessão. Esse token
 é enviado no header `Authorization` para que o gateway repasse a
 requisição aos microserviços.
 
-Um script `backup_db.sh` está disponível para gerar backups da base MySQL. Execute-o a partir de uma máquina com acesso ao banco externo.
-Há também o utilitário `sla_monitor.php` que dispara notificações antes do vencimento do SLA dos chamados.
+O utilitário `sla_monitor.php` dispara notificações antes do vencimento do SLA dos chamados.
 
 Todos os acessos e ações relevantes são registrados na tabela `logs` do banco de dados, permitindo auditoria completa.
