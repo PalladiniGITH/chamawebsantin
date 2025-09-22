@@ -6,7 +6,7 @@ return [
         'user_pool_id' => 'us-east-2_nGsr1zSvz',
         'client_id' => '5drp597e5uk101sbcsqqcgsmmn',
         'client_secret' => 'l0c2bbuk3l63h0u2d25cec4is0a05koj791bu5k2gfesrc8ntre',
-        'redirect_uri' => 'http://localhost:8080/auth_callback.php',
+        'redirect_uri' => 'https://localhost:8443/auth_callback.php',
         'scope' => 'email openid phone',
         
         // Domínio completo do Cognito (sem https://)

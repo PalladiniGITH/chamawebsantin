@@ -1014,6 +1014,40 @@ select option:hover {
   background-color: var(--error-color);
 }
 
+.flash-message {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  background: rgba(0, 0, 0, 0.05);
+  color: #1f1f1f;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.flash-message.flash-success {
+  background: rgba(76, 175, 80, 0.12);
+  color: #1b5e20;
+  border-color: rgba(76, 175, 80, 0.32);
+}
+
+.flash-message.flash-error {
+  background: rgba(244, 67, 54, 0.12);
+  color: #c62828;
+  border-color: rgba(244, 67, 54, 0.32);
+}
+
+.flash-message.flash-warning {
+  background: rgba(255, 152, 0, 0.12);
+  color: #e65100;
+  border-color: rgba(255, 152, 0, 0.32);
+}
+
+.flash-message.flash-info {
+  background: rgba(33, 150, 243, 0.12);
+  color: #0d47a1;
+  border-color: rgba(33, 150, 243, 0.32);
+}
+
 /* Estilo de tabelas administrativas */
 .admin-table {
   width: 100%;
