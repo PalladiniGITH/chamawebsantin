@@ -2,6 +2,7 @@
 // Manter todo o PHP original
 session_start();
 require_once 'inc/connect.php';
+require_once __DIR__ . '/inc/security.php';
 
 // Função de registro de mudança de campo
 function registrarMudanca($pdo, $ticket_id, $user_id, $campo, $old, $new) {
@@ -31,15 +32,20 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$user_id = $_SESSION['user_id'];
+$user_id = (int) $_SESSION['user_id'];
 $role    = $_SESSION['role'];
 
-if (!isset($_GET['id'])) {
+$ticketFeedback = $_SESSION['ticket_feedback'] ?? null;
+$ticketFeedbackType = $_SESSION['ticket_feedback_type'] ?? 'info';
+unset($_SESSION['ticket_feedback'], $_SESSION['ticket_feedback_type']);
+
+$ticketId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if ($ticketId === null || $ticketId === false) {
     header('Location: dashboard.php');
     exit;
 }
 
-$ticket_id = $_GET['id'];
+$ticket_id = $ticketId;
 
 // Buscar o chamado
 $stmtT = $pdo->prepare("SELECT t.*, u.email AS user_email, u.nome AS user_nome
@@ -62,21 +68,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Verifica se é comentário ou mudança de estado/encerramento
     if (isset($_POST['comentario'])) {
         // Adicionar Comentário
-        $conteudo = $_POST['comentario'];
-        $visivel_usuario = (isset($_POST['worknote']) && $_POST['worknote'] == '1') ? 0 : 1;
-        $anexo = null;
-
-        // Upload de anexo (RF04)
-        if (!empty($_FILES['anexo']['name'])) {
-            $arquivoTmp = $_FILES['anexo']['tmp_name'];
-            $nomeArq = $_FILES['anexo']['name'];
-            $destino = 'uploads/' . uniqid() . '_' . $nomeArq;
-            move_uploaded_file($arquivoTmp, $destino);
-            $anexo = $destino;
+        $conteudo = trim($_POST['comentario'] ?? '');
+        if ($conteudo === '') {
+            $_SESSION['ticket_feedback'] = 'O comentário não pode estar vazio.';
+            $_SESSION['ticket_feedback_type'] = 'error';
+            header("Location: ticket.php?id=$ticket_id");
+            exit;
         }
 
-        $stmtCom = $pdo->prepare("INSERT INTO comentarios (ticket_id, user_id, conteudo, visivel_usuario, anexo) 
-                                  VALUES (:tid, :uid, :c, :vu, :a)");
+        $visivel_usuario = (isset($_POST['worknote']) && $_POST['worknote'] === '1') ? 0 : 1;
+        $anexo = null;
+
+        // Upload de anexo (RF04) com validação de tipo e tamanho
+        if (!empty($_FILES['anexo']['name'])) {
+            $uploadError = null;
+            $arquivoTmp = $_FILES['anexo']['tmp_name'];
+            $nomeArq = $_FILES['anexo']['name'];
+
+            if ($_FILES['anexo']['error'] !== UPLOAD_ERR_OK) {
+                $uploadError = 'Falha no upload do anexo.';
+            } elseif ($_FILES['anexo']['size'] > 5 * 1024 * 1024) {
+                $uploadError = 'O anexo deve ter no máximo 5 MB.';
+            } else {
+                $allowedExtensions = ['pdf', 'png', 'jpg', 'jpeg', 'txt'];
+                $extension = strtolower((string) pathinfo($nomeArq, PATHINFO_EXTENSION));
+
+                if (!in_array($extension, $allowedExtensions, true)) {
+                    $uploadError = 'Formato de anexo não permitido.';
+                } else {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime = $finfo ? finfo_file($finfo, $arquivoTmp) : false;
+                    if ($finfo) {
+                        finfo_close($finfo);
+                    }
+
+                    $allowedMimeMap = [
+                        'pdf' => ['application/pdf'],
+                        'png' => ['image/png'],
+                        'jpg' => ['image/jpeg'],
+                        'jpeg' => ['image/jpeg'],
+                        'txt' => ['text/plain'],
+                    ];
+
+                    $mimeValid = false;
+                    $mimeValue = is_string($mime) ? $mime : '';
+                    foreach ($allowedMimeMap[$extension] as $allowedMime) {
+                        if (stripos($mimeValue, $allowedMime) === 0) {
+                            $mimeValid = true;
+                            break;
+                        }
+                    }
+
+                    if (!$mimeValid) {
+                        $uploadError = 'O tipo de arquivo do anexo não é permitido.';
+                    } else {
+                        $uploadDir = __DIR__ . '/uploads/';
+                        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
+                            $uploadError = 'Não foi possível preparar o diretório de uploads.';
+                        } else {
+                            $nomeSeguro = uniqid('att_', true) . '.' . $extension;
+                            $destinoRel = 'uploads/' . $nomeSeguro;
+                            $destinoAbs = $uploadDir . $nomeSeguro;
+
+                            if (move_uploaded_file($arquivoTmp, $destinoAbs)) {
+                                $anexo = $destinoRel;
+                            } else {
+                                $uploadError = 'Falha ao salvar o anexo.';
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($uploadError !== null) {
+                $_SESSION['ticket_feedback'] = $uploadError;
+                $_SESSION['ticket_feedback_type'] = 'error';
+                header("Location: ticket.php?id=$ticket_id");
+                exit;
+            }
+        }
+
+        $stmtCom = $pdo->prepare("INSERT INTO comentarios (ticket_id, user_id, conteudo, visivel_usuario, anexo)"
+                                  . " VALUES (:tid, :uid, :c, :vu, :a)");
         $stmtCom->execute([
             'tid' => $ticket_id,
             'uid' => $user_id,
@@ -89,16 +162,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($visivel_usuario) {
             // Envia e-mail para o solicitante, se não for ele mesmo
             if ($ticket['user_id'] != $user_id) {
-                enviarNotificacao($ticket['user_email'], 
+                enviarNotificacao($ticket['user_email'],
                     "Seu chamado #{$ticket_id} recebeu um comentário",
                     "Um novo comentário foi adicionado ao chamado: {$conteudo}"
                 );
             }
         }
-
     } else if (isset($_POST['acao'])) {
         // Pode ser encerrar, reabrir, atualizar estado, etc.
-        $acao = $_POST['acao'];
+        $acao = is_string($_POST['acao']) ? $_POST['acao'] : '';
+        $acoesPermitidas = ['encerrar', 'confirmar_encerramento', 'reabrir', 'atualizar'];
+        if (!in_array($acao, $acoesPermitidas, true)) {
+            $_SESSION['ticket_feedback'] = 'Ação inválida enviada.';
+            $_SESSION['ticket_feedback_type'] = 'error';
+            header("Location: ticket.php?id=$ticket_id");
+            exit;
+        }
 
         if ($acao === 'encerrar' && ($role === 'analista' || $role === 'administrador')) {
             $oldEstado = $ticket['estado'];
@@ -137,10 +216,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $oldRisco      = $ticket['risco'];
             $oldAssigned   = $ticket['assigned_to'];
 
-            $novaPrioridade = $_POST['nova_prioridade'] ?? $oldPrioridade;
-            $novoEstado     = $_POST['novo_estado'] ?? $oldEstado;
-            $novoRisco      = $_POST['novo_risco'] ?? $oldRisco;
-            $novoAssigned   = $_POST['novo_assigned_to'] ?? $oldAssigned;
+            $prioridadesPermitidas = ['Baixo', 'Medio', 'Alto', 'Critico'];
+            $estadosPermitidos = ['Aberto', 'Em Analise', 'Aguardando Usuario', 'Resolvido', 'Fechado'];
+            $riscosPermitidos = ['Baixo', 'Medio', 'Alto'];
+
+            $novaPrioridade = $oldPrioridade;
+            if (isset($_POST['nova_prioridade']) && in_array($_POST['nova_prioridade'], $prioridadesPermitidas, true)) {
+                $novaPrioridade = $_POST['nova_prioridade'];
+            }
+
+            $novoEstado = $oldEstado;
+            if (isset($_POST['novo_estado']) && in_array($_POST['novo_estado'], $estadosPermitidos, true)) {
+                $novoEstado = $_POST['novo_estado'];
+            }
+
+            $novoRisco = $oldRisco;
+            if (isset($_POST['novo_risco']) && in_array($_POST['novo_risco'], $riscosPermitidos, true)) {
+                $novoRisco = $_POST['novo_risco'];
+            }
+
+            $novoAssigned = $oldAssigned;
+            if (isset($_POST['novo_assigned_to'])) {
+                $novoAssigned = $_POST['novo_assigned_to'] === '' ? null : (int) $_POST['novo_assigned_to'];
+            }
 
             $stmtUpd = $pdo->prepare("UPDATE tickets 
                 SET prioridade=:p, estado=:e, risco=:r, assigned_to=:a 
@@ -185,13 +283,23 @@ if ($role === 'analista' || $role === 'administrador') {
     $stmtC->execute(['tid'=>$ticket_id]);
 }
 $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
+
+$ticketIdDisplay = (int) ($ticket['id'] ?? $ticket_id);
+$ticketTitulo = $ticket['titulo'] ?? '';
+$ticketEstado = $ticket['estado'] ?? '';
+$ticketPrioridade = $ticket['prioridade'] ?? '';
+$ticketRisco = $ticket['risco'] ?? '';
+$ticketTipo = $ticket['tipo'] ?? '';
+$estadoClass = sanitize_class_token($ticketEstado, 'status-');
+$prioridadeClass = sanitize_class_token($ticketPrioridade, 'priority-');
+$riscoClass = sanitize_class_token($ticketRisco, 'risk-');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chamado #<?php echo $ticket_id; ?></title>
+  <title>Chamado #<?php echo $ticketIdDisplay; ?></title>
   <link rel="stylesheet" href="/css/style.css" />
   <link rel="stylesheet" href="/css/animations.css" />
   <link rel="stylesheet" href="/css/enhanced.css" />
@@ -214,8 +322,13 @@ $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
   </header>
   
   <main>
+    <?php if (!empty($ticketFeedback)): ?>
+    <div class="flash-message <?php echo e(sanitize_class_token($ticketFeedbackType, 'flash-')); ?>">
+      <?php echo e($ticketFeedback); ?>
+    </div>
+    <?php endif; ?>
     <div class="dashboard-header">
-      <h2>Chamado #<?php echo $ticket['id']; ?> - <?php echo htmlspecialchars($ticket['titulo']); ?></h2>
+      <h2>Chamado #<?php echo $ticketIdDisplay; ?> - <?php echo e($ticketTitulo); ?></h2>
       <div class="ticket-actions">
         <a href="dashboard.php" class="button">Voltar ao Dashboard</a>
       </div>
@@ -232,28 +345,28 @@ $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
           
           <div class="info-group">
             <div class="info-label">Estado:</div>
-            <div class="info-value <?php echo 'status-' . strtolower($ticket['estado']); ?>" data-field="estado">
-              <?php echo $ticket['estado']; ?>
+            <div class="info-value <?php echo e($estadoClass); ?>" data-field="estado">
+              <?php echo e($ticketEstado); ?>
             </div>
           </div>
-          
+
           <div class="info-group">
             <div class="info-label">Prioridade:</div>
-            <div class="info-value <?php echo 'priority-' . strtolower($ticket['prioridade']); ?>" data-field="prioridade">
-              <?php echo $ticket['prioridade']; ?>
+            <div class="info-value <?php echo e($prioridadeClass); ?>" data-field="prioridade">
+              <?php echo e($ticketPrioridade); ?>
             </div>
           </div>
-          
+
           <div class="info-group">
             <div class="info-label">Risco:</div>
-            <div class="info-value <?php echo 'risk-' . strtolower($ticket['risco']); ?>" data-field="risco">
-              <?php echo $ticket['risco']; ?>
+            <div class="info-value <?php echo e($riscoClass); ?>" data-field="risco">
+              <?php echo e($ticketRisco); ?>
             </div>
           </div>
-          
+
           <div class="info-group">
             <div class="info-label">Tipo:</div>
-            <div class="info-value"><?php echo $ticket['tipo']; ?></div>
+            <div class="info-value"><?php echo e($ticketTipo); ?></div>
           </div>
           
           <div class="info-group">
@@ -274,7 +387,7 @@ $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
           
           <div class="info-group">
             <div class="info-label">Solicitante:</div>
-            <div class="info-value"><?php echo htmlspecialchars($ticket['user_nome']); ?></div>
+            <div class="info-value"><?php echo e($ticket['user_nome'] ?? ''); ?></div>
           </div>
         </div>
       </div>
@@ -332,9 +445,10 @@ $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
             <select id="novo_assigned_to" name="novo_assigned_to">
               <option value="">-- Ninguém --</option>
               <?php foreach($allAnalistas as $an): ?>
-                <option value="<?php echo $an['id']; ?>" 
-                  <?php if($ticket['assigned_to'] == $an['id']) echo 'selected'; ?>>
-                  <?php echo $an['nome']; ?>
+                <?php $analistaId = (int) ($an['id'] ?? 0); ?>
+                <option value="<?php echo $analistaId; ?>"
+                  <?php if((int) ($ticket['assigned_to'] ?? 0) === $analistaId) echo 'selected'; ?>>
+                  <?php echo e($an['nome'] ?? ''); ?>
                 </option>
               <?php endforeach; ?>
             </select>
@@ -398,8 +512,8 @@ $comentarios = $stmtC->fetchAll(PDO::FETCH_ASSOC);
                 <?php if (!$c['visivel_usuario']) echo ' <em>(Work Note)</em>'; ?>
               </div>
               <p><?php echo nl2br(htmlspecialchars($c['conteudo'])); ?></p>
-              <?php if ($c['anexo']): ?>
-                <p class="attachment"><a href="<?php echo $c['anexo']; ?>" target="_blank" class="icon-attachment">Ver Anexo</a></p>
+              <?php if (!empty($c['anexo']) && strpos($c['anexo'], 'uploads/') === 0): ?>
+                <p class="attachment"><a href="<?php echo e($c['anexo']); ?>" target="_blank" class="icon-attachment">Ver Anexo</a></p>
               <?php endif; ?>
             </div>
           <?php endforeach; ?>

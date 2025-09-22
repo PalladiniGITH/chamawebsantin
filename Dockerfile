@@ -20,24 +20,29 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local
 # Copia os arquivos do projeto para dentro do Apache
 COPY . /var/www/html/
 
-# Dá permissão aos arquivos
-RUN chown -R www-data:www-data /var/www/html
-
 # Ativa o mod_rewrite do Apache (se necessário)
-RUN a2enmod rewrite ssl && \
+RUN a2enmod rewrite ssl headers && \
     a2ensite default-ssl && \
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-      -keyout /etc/ssl/private/selfsigned.key \
-      -out /etc/ssl/certs/selfsigned.crt \
-      -subj "/CN=localhost" && \
-    sed -i 's#/etc/ssl/certs/ssl-cert-snakeoil.pem#/etc/ssl/certs/selfsigned.crt#' /etc/apache2/sites-available/default-ssl.conf && \
-    sed -i 's#/etc/ssl/private/ssl-cert-snakeoil.key#/etc/ssl/private/selfsigned.key#' /etc/apache2/sites-available/default-ssl.conf
+    sed -i 's#/etc/ssl/certs/ssl-cert-snakeoil.pem#/etc/ssl/certs/web.crt#' /etc/apache2/sites-available/default-ssl.conf && \
+    sed -i 's#/etc/ssl/private/ssl-cert-snakeoil.key#/etc/ssl/private/web.key#' /etc/apache2/sites-available/default-ssl.conf && \
+    sed -i 's#<VirtualHost _default_:443>#<VirtualHost *:8443>#' /etc/apache2/sites-available/default-ssl.conf && \
+    a2dissite 000-default && \
+    sed -i 's/^Listen 80/#Listen 80/' /etc/apache2/ports.conf && \
+    sed -i 's/Listen 443/Listen 8443/g' /etc/apache2/ports.conf
+
+COPY docker/apache/start-apache.sh /usr/local/bin/start-apache.sh
+RUN chmod +x /usr/local/bin/start-apache.sh
 
 # Instalar as dependências do Composer (se houver um composer.json)
 WORKDIR /var/www/html
 RUN if [ -f "composer.json" ]; then composer install --no-interaction; fi
 
+# Dá permissão aos arquivos
+RUN chown -R www-data:www-data /var/www/html
+
 # Define o diretório de trabalho padrão
 WORKDIR /var/www/html
 
-EXPOSE 80 443
+EXPOSE 8443
+
+CMD ["start-apache.sh"]
