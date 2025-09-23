@@ -1,0 +1,4 @@
+lab-pki/
+*.p12
+*.key
+certs/*.key
