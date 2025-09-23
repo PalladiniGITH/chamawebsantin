@@ -37,7 +37,9 @@ Este projeto demonstra uma arquitetura simples de microserviços em PHP. Os serv
 
 ## Executando
 
-Utilize o `docker-compose` para subir todos os serviços. O serviço `db_check` ficará em loop até que a porta `DATABASE_PORT` do host `DATABASE_HOST` esteja acessível.
+Antes de subir uma nova versão, execute um `docker-compose down --remove-orphans` para limpar contêineres antigos. Isso evita que versões anteriores deixem metadados órfãos que possam gerar o erro `KeyError: 'ContainerConfig'` em instalações mais antigas do Compose.
+
+Em seguida, utilize o `docker-compose` para subir todos os serviços. O serviço `db_check` ficará em loop até que a porta `DATABASE_PORT` do host `DATABASE_HOST` esteja acessível.
 
 ```bash
 docker-compose up --build

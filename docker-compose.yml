@@ -3,7 +3,6 @@ version: '3.8'
 services:
   web:
     build: .
-    image: web:latest
     ports:
       - "8443:8443"
     environment:
@@ -47,7 +46,6 @@ services:
     build:
       context: .
       dockerfile: services/gateway/Dockerfile
-    image: gateway:latest
     environment:
       DATABASE_HOST: ${DATABASE_HOST:-192.168.8.34}
       DATABASE_PORT: ${DATABASE_PORT:-3306}
@@ -78,7 +76,6 @@ services:
     build:
       context: .
       dockerfile: services/tickets/Dockerfile
-    image: tickets:latest
     environment:
       DATABASE_HOST: ${DATABASE_HOST:-192.168.8.34}
       DATABASE_PORT: ${DATABASE_PORT:-3306}
@@ -107,7 +104,6 @@ services:
     build:
       context: .
       dockerfile: services/stats/Dockerfile
-    image: stats:latest
     environment:
       DATABASE_HOST: ${DATABASE_HOST:-192.168.8.34}
       DATABASE_PORT: ${DATABASE_PORT:-3306}
