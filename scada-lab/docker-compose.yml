@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+
+  scadabr:
+    build: ./scadabr
+    container_name: scadabr
+    restart: unless-stopped
+    networks:
+      - scada_net
+    ports:
+      - "8080:8080"
+    environment:
+      - JAVA_OPTS=-Xmx1024m
+    depends_on:
+      - modbus-sim
+
+  modbus-sim:
+    build: ./modbus-sim
+    container_name: modbus-sim
+    restart: unless-stopped
+    networks:
+      - scada_net
+    # Não expor 502 para host por segurança; se precisar, remova o comentário abaixo
+    # ports:
+    #   - "502:502"
+    volumes:
+      - ./modbus-sim/modbus_server.py:/opt/modbus_server.py:ro
+
+networks:
+  scada_net:
+    driver: bridge
